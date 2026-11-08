@@ -15,7 +15,7 @@ using Forms = System.Windows.Forms;
 
 namespace ProjZomb.App;
 
-public partial class MainWindow : Window
+public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
 {
     private readonly ServerController server = new();
     private readonly Forms.NotifyIcon tray = null!;
@@ -35,6 +35,7 @@ public partial class MainWindow : Window
         instanceMutex = new Mutex(true, "Local\\ProjZomb-LocalManager", out bool first);
         if (!first) { MessageBox.Show("ProjZomb is already running. Check the system tray."); instanceMutex.Dispose(); System.Windows.Application.Current.Shutdown(); return; }
         InitializeComponent();
+        ThemeChoice.SelectedIndex = AppearanceService.Preference == "Light" ? 1 : AppearanceService.Preference == "System" ? 2 : 0;
         tray = new Forms.NotifyIcon { Icon = System.Drawing.SystemIcons.Application, Text = "ProjZomb — Stopped", Visible = true };
         var menu = new Forms.ContextMenuStrip();
         menu.Items.Add("Open ProjZomb", null, (_, _) => Dispatcher.Invoke(ShowWindow));
@@ -58,6 +59,16 @@ public partial class MainWindow : Window
         BackupPath.Text = profile.BackupDirectory; SteamPath.Text = profile.SteamCmdPath;
         ProfileName.Text = profile.ServerName; BranchName.Text = profile.Branch;
         Closed += (_, _) => { tray.Dispose(); server.Dispose(); instanceMutex.ReleaseMutex(); instanceMutex.Dispose(); };
+    }
+    private void ThemeChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!IsInitialized || ThemeChoice.SelectedItem is not ComboBoxItem item || item.Content is not string preference || preference == AppearanceService.Preference) return;
+        try { AppearanceService.SetPreference(preference); }
+        catch (Exception ex)
+        {
+            ThemeChoice.SelectedIndex = AppearanceService.Preference == "Light" ? 1 : AppearanceService.Preference == "System" ? 2 : 0;
+            Alert("Could not save appearance preference: " + ex.Message);
+        }
     }
     private void ShowWindow() { Show(); WindowState = WindowState.Normal; Activate(); }
     private void AppendLog(string text)

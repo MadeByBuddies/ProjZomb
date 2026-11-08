@@ -1,6 +1,6 @@
 # ProjZomb
 
-A portable Windows desktop manager for a **local Project Zomboid Build 42 dedicated server**, built with C#/.NET 8, WPF and Windows Forms notification-area integration. Version 0.1.0.
+A portable Windows desktop manager for a **local Project Zomboid Build 42 dedicated server**, built with C#/.NET 8, WPF and Windows Forms notification-area integration. Version 0.1.1.
 
 ## Version 1
 
@@ -12,6 +12,12 @@ A portable Windows desktop manager for a **local Project Zomboid Build 42 dedica
 - Online player list via `players`; request kick, username ban/unban, and access-level changes. Console responses remain authoritative.
 - Manual local backups and restore of profile configuration, world and server database. SHA-256 manifest checks, traversal/duplicate entry rejection, safety backup and rollback on application errors.
 - Configuration saves keep the previous file outside the server data directory and reject external-edit conflicts.
+
+## Fluent interface
+
+WPF UI supplies the flat controls and integrated title bar. Use the left sidebar to navigate; choose **Dark**, **Light** or **System** under **Appearance**. Dark is the default. The choice is saved locally in `data/appearance.json`; System follows Windows changes, and Windows high contrast takes precedence over normal appearance preferences. Opaque surfaces avoid wallpaper-dependent contrast. The custom title bar retains window controls, and closing still hides to the system tray.
+
+Fields, dropdowns, list selection, the configuration grid and primary buttons use WPF UI theme resources rather than the old fixed foreground/background palette. Console command and private input now have separate rows so they remain usable at the minimum window size. Mods and backups scroll when space is limited.
 
 ## Run the portable release
 
@@ -56,7 +62,15 @@ Publish the portable self-contained executable (the recipient does not need .NET
 dotnet publish src/ProjZomb.App -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=None -o artifacts/win-x64
 ```
 
-The Windows framework may extract bundled native libraries to the user's temporary folder. Build separately for other CPU architectures; this release targets x64. No third-party NuGet packages are required. Restore obtains Microsoft WindowsDesktop/.NET targeting/runtime packs from NuGet.
+The Windows framework may extract bundled native libraries to the user's temporary folder. Build separately for other CPU architectures; this release targets x64. The interface uses the pinned WPF-UI 4.3.0 NuGet package (plus its WPF-UI.Abstractions dependency). Restore also obtains Microsoft WindowsDesktop/.NET targeting/runtime packs. Third-party notices and the upstream MIT license are copied into published distributions; keep them beside the executable.
+
+On Windows, with the normal app closed, run the UI smoke harness:
+
+```powershell
+dotnet run --project tests/ProjZomb.UiTests
+```
+
+It opens the actual WPF window at its minimum size, resolves the theme resources, visits every section in dark/light themes, exercises configuration editing and dropdown templates, and measures primary/secondary resource text contrast against the application surface (4.5:1 minimum). It does not start a server or modify server data. This supplements manual inspection of actual control states, high contrast, DPI and window behavior; it is not a full visual accessibility audit.
 
 Core tests run on Linux or Windows using only the SDK. The WPF project can be cross-compiled with `EnableWindowsTargeting`, but its UI and Windows batch launcher must run on Windows.
 

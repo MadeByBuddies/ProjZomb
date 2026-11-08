@@ -1,75 +1,105 @@
-<Window x:Class="ProjZomb.App.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="ProjZomb • Server Manager" Width="1200" Height="820" MinWidth="940" MinHeight="650" Closing="WindowClosing">
- <Grid Margin="24">
+<ui:FluentWindow x:Class="ProjZomb.App.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml" Title="ProjZomb • Server Manager" ExtendsContentIntoTitleBar="True" WindowBackdropType="None" Background="{DynamicResource ApplicationBackgroundBrush}" Foreground="{DynamicResource TextFillColorPrimaryBrush}" FontFamily="Segoe UI" FontSize="14" Width="1200" Height="820" MinWidth="940" MinHeight="650" Closing="WindowClosing">
+ <Grid>
+  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+  <ui:TitleBar Title="ProjZomb · Server Manager" Height="48" ForceShutdown="False" />
+  <Grid Grid.Row="1" Margin="16,0,16,12">
+   <Grid.ColumnDefinitions><ColumnDefinition Width="200"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+   <Border Margin="0,0,16,0" Padding="8,16,8,8" Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8">
+    <DockPanel LastChildFill="True">
+     <StackPanel DockPanel.Dock="Top" Margin="10,0,0,20"><TextBlock Text="PROJZOMB" FontSize="20" FontWeight="Bold"/><TextBlock Text="BUILD 42 · LOCAL SERVER" FontSize="10" Style="{StaticResource SecondaryText}"/></StackPanel>
+     <StackPanel DockPanel.Dock="Bottom" Margin="8,12,0,0">
+      <TextBlock Text="Appearance" Style="{StaticResource SecondaryText}"/>
+      <ComboBox x:Name="ThemeChoice" SelectionChanged="ThemeChanged" AutomationProperties.Name="Application appearance">
+       <ComboBoxItem Content="Dark"/><ComboBoxItem Content="Light"/><ComboBoxItem Content="System"/>
+      </ComboBox>
+      <TextBlock Text="Closing the window keeps your server in the system tray." Style="{StaticResource SecondaryText}" FontSize="12"/>
+     </StackPanel>
+     <ListBox x:Name="Navigation" BorderThickness="0" Background="Transparent" SelectedIndex="0" ItemContainerStyle="{StaticResource NavigationItem}" AutomationProperties.Name="Main navigation">
+      <ListBoxItem><StackPanel Orientation="Horizontal"><ui:SymbolIcon Symbol="Home24"/><TextBlock Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Text="Setup" Margin="12,0,0,0"/></StackPanel></ListBoxItem>
+      <ListBoxItem><StackPanel Orientation="Horizontal"><ui:SymbolIcon Symbol="Code24"/><TextBlock Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Text="Console" Margin="12,0,0,0"/></StackPanel></ListBoxItem>
+      <ListBoxItem><StackPanel Orientation="Horizontal"><ui:SymbolIcon Symbol="Settings24"/><TextBlock Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Text="Configuration" Margin="12,0,0,0"/></StackPanel></ListBoxItem>
+      <ListBoxItem><StackPanel Orientation="Horizontal"><ui:SymbolIcon Symbol="Apps24"/><TextBlock Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Text="Mods" Margin="12,0,0,0"/></StackPanel></ListBoxItem>
+      <ListBoxItem><StackPanel Orientation="Horizontal"><ui:SymbolIcon Symbol="People24"/><TextBlock Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Text="Players" Margin="12,0,0,0"/></StackPanel></ListBoxItem>
+      <ListBoxItem><StackPanel Orientation="Horizontal"><ui:SymbolIcon Symbol="Save24"/><TextBlock Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Text="Backups" Margin="12,0,0,0"/></StackPanel></ListBoxItem>
+     </ListBox>
+    </DockPanel>
+   </Border>
+   <Grid Grid.Column="1">
   <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-  <DockPanel><StackPanel DockPanel.Dock="Left"><TextBlock Text="PROJZOMB" FontSize="30" FontWeight="Bold" Foreground="#C2DEB2"/><TextBlock Text="Local server command center • Build 42" Foreground="#9AB0BF"/></StackPanel><TextBlock x:Name="StatusText" Text="● Stopped" FontSize="20" HorizontalAlignment="Right" VerticalAlignment="Center"/></DockPanel>
-  <WrapPanel Grid.Row="1" Margin="0,10,0,8" x:Name="LifecyclePanel"><Button Content="▶ Start server" Click="StartClick"/><Button Content="■ Save &amp; stop" Click="StopClick"/><Button Content="↻ Restart" Click="RestartClick"/><Button Content="Save world" Click="SaveWorldClick"/><Button Content="Hide to tray" Click="HideClick"/></WrapPanel>
-  <TabControl Grid.Row="2" Background="{StaticResource Panel}" BorderBrush="#334957" Padding="16">
+  <DockPanel><StackPanel DockPanel.Dock="Left"><TextBlock Text="PROJZOMB" FontSize="30" FontWeight="Bold" Foreground="{DynamicResource TextFillColorPrimaryBrush}"/><TextBlock Text="Server controls" Style="{StaticResource SecondaryText}"/></StackPanel><TextBlock x:Name="StatusText" Text="● Stopped" FontSize="16" TextWrapping="Wrap" MaxWidth="360" Margin="16,0,0,0" HorizontalAlignment="Right" VerticalAlignment="Center"/></DockPanel>
+  <WrapPanel Grid.Row="1" Margin="0,10,0,8" x:Name="LifecyclePanel"><ui:Button Content="Start server" Appearance="Primary" Click="StartClick"/><ui:Button Content="Save &amp; stop" Click="StopClick"/><ui:Button Content="Restart" Click="RestartClick"/><ui:Button Content="Save world" Click="SaveWorldClick"/><ui:Button Content="Hide to tray" Click="HideClick"/></WrapPanel>
+  <TabControl Grid.Row="2" x:Name="Pages" SelectedIndex="{Binding SelectedIndex, ElementName=Navigation, Mode=TwoWay}" Style="{StaticResource PageHost}" Padding="16">
    <TabItem Header="Setup"><ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel x:Name="SetupPanel">
-    <TextBlock Text="Your server, your machine" FontSize="23" FontWeight="SemiBold"/>
+    <TextBlock Text="Your server, your machine" Style="{StaticResource PageHeading}"/>
     <TextBlock Text="Choose an existing installation, or install/update into your selected folder using Valve SteamCMD." TextWrapping="Wrap"/>
-    <TextBlock Text="Dedicated-server installation folder"/><DockPanel><Button DockPanel.Dock="Right" Content="Browse…" Click="BrowseInstall"/><TextBox x:Name="InstallPath"/></DockPanel>
-    <TextBlock Text="Zomboid data folder (contains Server, Saves and db)"/><DockPanel><Button DockPanel.Dock="Right" Content="Browse…" Click="BrowseData"/><TextBox x:Name="DataPath"/></DockPanel>
-    <TextBlock Text="Server profile name (filename, not the public display name)"/><TextBox x:Name="ProfileName" Text="servertest"/>
-    <TextBlock Text="Backup folder (outside the data folder)"/><DockPanel><Button DockPanel.Dock="Right" Content="Browse…" Click="BrowseBackups"/><TextBox x:Name="BackupPath"/></DockPanel>
-    <Button Content="Save paths and profile" HorizontalAlignment="Left" Click="SaveProfileClick"/>
+    <TextBlock Text="Dedicated-server installation folder"/><DockPanel><ui:Button DockPanel.Dock="Right" Content="Browse…" Click="BrowseInstall"/><TextBox x:Name="InstallPath" AutomationProperties.Name="Dedicated-server installation folder"/></DockPanel>
+    <TextBlock Text="Zomboid data folder (contains Server, Saves and db)"/><DockPanel><ui:Button DockPanel.Dock="Right" Content="Browse…" Click="BrowseData"/><TextBox x:Name="DataPath" AutomationProperties.Name="Zomboid data folder"/></DockPanel>
+    <TextBlock Text="Server profile name (filename, not the public display name)"/><TextBox x:Name="ProfileName" AutomationProperties.Name="Server profile name" Text="servertest"/>
+    <TextBlock Text="Backup folder (outside the data folder)"/><DockPanel><ui:Button DockPanel.Dock="Right" Content="Browse…" Click="BrowseBackups"/><TextBox x:Name="BackupPath" AutomationProperties.Name="Backup folder"/></DockPanel>
+    <ui:Button Content="Save paths and profile" Appearance="Primary" HorizontalAlignment="Left" Click="SaveProfileClick"/>
     <GroupBox Header="Install / update server"><StackPanel>
-     <TextBlock Text="Trusted steamcmd.exe"/><DockPanel><Button DockPanel.Dock="Right" Content="Browse…" Click="BrowseSteam"/><TextBox x:Name="SteamPath"/></DockPanel>
-     <TextBlock Text="Steam branch (blank = public; verify that your selected branch supplies Build 42)"/><TextBox x:Name="BranchName"/>
-     <TextBlock Text="SteamCMD source: https://developer.valvesoftware.com/wiki/SteamCMD — obtain it from Valve yourself. No bootstrap script is downloaded or executed by this app." TextWrapping="Wrap" Foreground="#9AB0BF"/>
+     <TextBlock Text="Trusted steamcmd.exe"/><DockPanel><ui:Button DockPanel.Dock="Right" Content="Browse…" Click="BrowseSteam"/><TextBox x:Name="SteamPath" AutomationProperties.Name="SteamCMD executable"/></DockPanel>
+     <TextBlock Text="Steam branch (blank = public; verify that your selected branch supplies Build 42)"/><TextBox x:Name="BranchName" AutomationProperties.Name="Steam branch"/>
+     <TextBlock Text="SteamCMD source: https://developer.valvesoftware.com/wiki/SteamCMD — obtain it from Valve yourself. No bootstrap script is downloaded or executed by this app." TextWrapping="Wrap" Style="{StaticResource SecondaryText}"/>
      <TextBlock Text="Installation sends anonymous download requests to Steam. Existing worlds/configs are not uploaded. Back up before updates; older builds may not open newer saves." TextWrapping="Wrap"/>
-     <Button Content="Review and install / update" HorizontalAlignment="Left" Click="InstallClick"/>
+     <ui:Button Content="Review and install / update" HorizontalAlignment="Left" Click="InstallClick"/>
     </StackPanel></GroupBox>
-    <TextBlock Text="First run: the server may request an administrator password in the Console tab. The launcher controls Java memory; adjust its supported launch settings if startup reports insufficient memory. Configure router/firewall UDP ports yourself. This app does not expose an administration website." TextWrapping="Wrap" Foreground="#9AB0BF"/>
+    <TextBlock Text="First run: the server may request an administrator password in the Console tab. The launcher controls Java memory; adjust its supported launch settings if startup reports insufficient memory. Configure router/firewall UDP ports yourself. This app does not expose an administration website." TextWrapping="Wrap" Style="{StaticResource SecondaryText}"/>
    </StackPanel></ScrollViewer></TabItem>
    <TabItem Header="Console"><Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-    <TextBlock Text="Live local output • commands are sent directly to the server. Input is not echoed or saved by this manager." Foreground="#9AB0BF" TextWrapping="Wrap"/>
-    <TextBox Grid.Row="1" x:Name="ConsoleOutput" IsReadOnly="True" AcceptsReturn="True" FontFamily="Consolas" FontSize="12" TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/>
-    <DockPanel Grid.Row="2"><Button DockPanel.Dock="Right" Content="Send" Click="SendClick"/><PasswordBox DockPanel.Dock="Right" x:Name="SecretInput" Width="180" Margin="0,4,8,8" ToolTip="Private input for first-run password prompts" KeyDown="SecretKeyDown"/><Button DockPanel.Dock="Right" Content="Send private input" Click="SendSecretClick"/><TextBox x:Name="CommandInput" ToolTip="Console command (no leading slash)" KeyDown="CommandKeyDown"/></DockPanel>
+    <TextBlock Text="Live local output • commands are sent directly to the server. Input is not echoed or saved by this manager." Style="{StaticResource SecondaryText}" TextWrapping="Wrap"/>
+    <TextBox Grid.Row="1" x:Name="ConsoleOutput" AutomationProperties.Name="Server console output" IsReadOnly="True" AcceptsReturn="True" FontFamily="Consolas" FontSize="12" TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/>
+    <StackPanel Grid.Row="2">
+     <DockPanel><ui:Button DockPanel.Dock="Right" Content="Send command" Appearance="Primary" Click="SendClick"/><TextBox x:Name="CommandInput" ToolTip="Console command (no leading slash)" AutomationProperties.Name="Console command" KeyDown="CommandKeyDown"/></DockPanel>
+     <DockPanel><ui:Button DockPanel.Dock="Right" Content="Send private input" Click="SendSecretClick"/><PasswordBox x:Name="SecretInput" ToolTip="Private input for first-run password prompts" AutomationProperties.Name="Private server input" KeyDown="SecretKeyDown"/></DockPanel>
+    </StackPanel>
    </Grid></TabItem>
    <TabItem Header="Configuration"><Grid x:Name="ConfigurationPanel"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-    <DockPanel><Button DockPanel.Dock="Right" Content="Reload files" Click="ReloadConfigClick"/><ComboBox x:Name="ConfigFiles" SelectionChanged="ConfigFileChanged" MinWidth="280"/></DockPanel>
-    <TextBlock Grid.Row="1" Text="Stop the server before editing. Changes require restart. Unknown settings and complex Lua remain available in Raw. Descriptions use server comments where available." TextWrapping="Wrap" Foreground="#9AB0BF"/>
+    <DockPanel><ui:Button DockPanel.Dock="Right" Content="Reload files" Click="ReloadConfigClick"/><ComboBox x:Name="ConfigFiles" AutomationProperties.Name="Configuration file" SelectionChanged="ConfigFileChanged" MinWidth="280"/></DockPanel>
+    <TextBlock Grid.Row="1" Text="Stop the server before editing. Changes require restart. Unknown settings and complex Lua remain available in Raw. Descriptions use server comments where available." TextWrapping="Wrap" Style="{StaticResource SecondaryText}"/>
     <TabControl Grid.Row="2" x:Name="EditorTabs" SelectionChanged="EditorTabChanged">
      <TabItem Header="Settings"><Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="100"/></Grid.RowDefinitions>
-      <TextBox x:Name="ConfigSearch" TextChanged="SearchChanged" ToolTip="Search setting name, category or description"/>
-      <DataGrid Grid.Row="1" x:Name="SettingsGrid" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False" SelectionChanged="SettingSelected" Background="#E7EDF0" Foreground="#101820" RowBackground="#EDF2F4" AlternatingRowBackground="#DCE6EA" EnableRowVirtualization="True">
+      <TextBox x:Name="ConfigSearch" AutomationProperties.Name="Search settings" TextChanged="SearchChanged" ToolTip="Search setting name, category or description"/>
+      <DataGrid Grid.Row="1" x:Name="SettingsGrid" AutomationProperties.Name="Server configuration settings" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False" SelectionChanged="SettingSelected" EnableRowVirtualization="True">
        <DataGrid.Columns><DataGridTextColumn Header="Category" Binding="{Binding Category}" IsReadOnly="True" Width="135"/><DataGridTextColumn Header="Setting" Binding="{Binding Key}" IsReadOnly="True" Width="2*"/><DataGridTextColumn Header="Value" Binding="{Binding Value, UpdateSourceTrigger=PropertyChanged}" Width="2*"/></DataGrid.Columns>
       </DataGrid>
-      <TextBox Grid.Row="2" x:Name="SettingDescription" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"/>
+      <TextBox Grid.Row="2" x:Name="SettingDescription" AutomationProperties.Name="Selected setting description" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"/>
      </Grid></TabItem>
-     <TabItem Header="Raw"><TextBox x:Name="RawConfig" AcceptsReturn="True" AcceptsTab="True" FontFamily="Consolas" FontSize="13" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/></TabItem>
+     <TabItem Header="Raw"><TextBox x:Name="RawConfig" AutomationProperties.Name="Raw configuration" AcceptsReturn="True" AcceptsTab="True" FontFamily="Consolas" FontSize="13" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/></TabItem>
     </TabControl>
-    <Button Grid.Row="3" Content="Validate and save locally" HorizontalAlignment="Left" Click="SaveConfigClick"/>
+    <ui:Button Grid.Row="3" Content="Validate and save locally" Appearance="Primary" HorizontalAlignment="Left" Click="SaveConfigClick"/>
    </Grid></TabItem>
-   <TabItem Header="Mods"><StackPanel x:Name="ModsPanel">
-    <TextBlock Text="Workshop and load order" FontSize="23"/>
+   <TabItem Header="Mods"><ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel x:Name="ModsPanel">
+    <TextBlock Text="Workshop and load order" Style="{StaticResource PageHeading}"/>
     <TextBlock Text="Stop the server first. Enter one ID per line, in load order. A Workshop item can provide multiple mod IDs; these lists are not necessarily one-to-one. Downloads occur through the game when it starts." TextWrapping="Wrap"/>
-    <TextBlock Text="Workshop item numbers"/><TextBox x:Name="WorkshopIds" AcceptsReturn="True" Height="140" VerticalScrollBarVisibility="Auto"/>
-    <TextBlock Text="Internal mod IDs (exact spelling, one per line)"/><TextBox x:Name="ModIds" AcceptsReturn="True" Height="140" VerticalScrollBarVisibility="Auto"/>
-    <WrapPanel><Button Content="Load mod lists" Click="LoadModsClick"/><Button Content="Save mod lists" Click="SaveModsClick"/></WrapPanel>
-    <TextBlock Text="Reorder lines to change load order. Map ordering is edited through the configuration's Map setting. Compatibility and dependency resolution are manual in version 1." TextWrapping="Wrap" Foreground="#9AB0BF"/>
-   </StackPanel></TabItem>
-   <TabItem Header="Players"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="280"/></Grid.ColumnDefinitions><StackPanel>
-    <TextBlock Text="Local server moderation" FontSize="23"/>
+    <TextBlock Text="Workshop item numbers"/><TextBox x:Name="WorkshopIds" AutomationProperties.Name="Workshop item IDs in load order" AcceptsReturn="True" Height="140" VerticalScrollBarVisibility="Auto"/>
+    <TextBlock Text="Internal mod IDs (exact spelling, one per line)"/><TextBox x:Name="ModIds" AutomationProperties.Name="Internal mod IDs in load order" AcceptsReturn="True" Height="140" VerticalScrollBarVisibility="Auto"/>
+    <WrapPanel><ui:Button Content="Load mod lists" Click="LoadModsClick"/><ui:Button Content="Save mod lists" Click="SaveModsClick"/></WrapPanel>
+    <TextBlock Text="Reorder lines to change load order. Map ordering is edited through the configuration's Map setting. Compatibility and dependency resolution are manual in version 1." TextWrapping="Wrap" Style="{StaticResource SecondaryText}"/>
+   </StackPanel></ScrollViewer></TabItem>
+   <TabItem Header="Players"><ScrollViewer VerticalScrollBarVisibility="Auto"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="280"/></Grid.ColumnDefinitions><StackPanel>
+    <TextBlock Text="Local server moderation" Style="{StaticResource PageHeading}"/>
     <TextBlock Text="Refresh uses the server's players command. Results depend on the installed Build 42 console format; you can also enter a username manually." TextWrapping="Wrap"/>
-    <Button Content="Refresh online players" HorizontalAlignment="Left" Click="RefreshPlayersClick"/>
-    <ListBox x:Name="PlayersList" Height="240" SelectionChanged="PlayerSelected"/>
+    <ui:Button Content="Refresh online players" HorizontalAlignment="Left" Click="RefreshPlayersClick"/>
+    <ListBox x:Name="PlayersList" AutomationProperties.Name="Online players" Height="240" SelectionChanged="PlayerSelected"/>
    </StackPanel><StackPanel Grid.Column="1" Margin="20,0,0,0" x:Name="PlayerActions">
-    <TextBlock Text="Exact username"/><TextBox x:Name="PlayerName"/>
-    <Button Content="Kick player" Click="KickClick"/><Button Content="Ban username" Click="BanClick"/><Button Content="Unban username" Click="UnbanClick"/>
-    <TextBlock Text="Access level"/><ComboBox x:Name="AccessLevel" SelectedIndex="0"><ComboBoxItem Content="none"/><ComboBoxItem Content="observer"/><ComboBoxItem Content="gm"/><ComboBoxItem Content="overseer"/><ComboBoxItem Content="moderator"/><ComboBoxItem Content="admin"/></ComboBox>
-    <Button Content="Apply access level" Click="AccessClick"/>
-    <TextBlock Text="Actions request supported game commands. Check the console for acceptance; sending a command does not prove success." TextWrapping="Wrap" Foreground="#9AB0BF"/>
-   </StackPanel></Grid></TabItem>
-   <TabItem Header="Backups"><StackPanel x:Name="BackupsPanel">
-    <TextBlock Text="Local restore points" FontSize="23"/>
+    <TextBlock Text="Exact username"/><TextBox x:Name="PlayerName" AutomationProperties.Name="Exact player username"/>
+    <ui:Button Content="Kick player" Click="KickClick"/><ui:Button Content="Ban username" Click="BanClick"/><ui:Button Content="Unban username" Click="UnbanClick"/>
+    <TextBlock Text="Access level"/><ComboBox x:Name="AccessLevel" AutomationProperties.Name="Player access level" SelectedIndex="0"><ComboBoxItem Content="none"/><ComboBoxItem Content="observer"/><ComboBoxItem Content="gm"/><ComboBoxItem Content="overseer"/><ComboBoxItem Content="moderator"/><ComboBoxItem Content="admin"/></ComboBox>
+    <ui:Button Content="Apply access level" Click="AccessClick"/>
+    <TextBlock Text="Actions request supported game commands. Check the console for acceptance; sending a command does not prove success." TextWrapping="Wrap" Style="{StaticResource SecondaryText}"/>
+   </StackPanel></Grid></ScrollViewer></TabItem>
+   <TabItem Header="Backups"><ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel x:Name="BackupsPanel">
+    <TextBlock Text="Local restore points" Style="{StaticResource PageHeading}"/>
     <TextBlock Text="The server must be stopped, including any copy running outside this manager. Archives include this profile's settings, world and server database. Other profiles and Workshop downloads are excluded." TextWrapping="Wrap"/>
-    <WrapPanel><Button Content="Create backup" Click="BackupClick"/><Button Content="Refresh list" Click="RefreshBackupsClick"/></WrapPanel>
-    <ListBox x:Name="BackupsList" Height="240"/>
-    <Button Content="Restore selected backup…" HorizontalAlignment="Left" Click="RestoreClick"/>
-    <TextBlock Text="Restore validates archive paths and SHA-256 hashes, takes a safety backup, then replaces this profile's data. Only ProjZomb archives for the same profile name are accepted. Backups contain passwords: protect your backup folder." TextWrapping="Wrap" Foreground="#9AB0BF"/>
-   </StackPanel></TabItem>
+    <WrapPanel><ui:Button Content="Create backup" Click="BackupClick"/><ui:Button Content="Refresh list" Click="RefreshBackupsClick"/></WrapPanel>
+    <ListBox x:Name="BackupsList" AutomationProperties.Name="Local backup archives" Height="240"/>
+    <ui:Button Content="Restore selected backup…" HorizontalAlignment="Left" Click="RestoreClick"/>
+    <TextBlock Text="Restore validates archive paths and SHA-256 hashes, takes a safety backup, then replaces this profile's data. Only ProjZomb archives for the same profile name are accepted. Backups contain passwords: protect your backup folder." TextWrapping="Wrap" Style="{StaticResource SecondaryText}"/>
+   </StackPanel></ScrollViewer></TabItem>
   </TabControl>
-  <DockPanel Grid.Row="3" Margin="0,10,0,0"><Button DockPanel.Dock="Right" Content="Exit manager…" Click="ExitClick"/><TextBlock x:Name="Notice" Text="Select your server folders in Setup to begin." TextWrapping="Wrap" Foreground="#9AB0BF" VerticalAlignment="Center"/></DockPanel>
+  <DockPanel Grid.Row="3" Margin="0,10,0,0"><ui:Button DockPanel.Dock="Right" Content="Exit manager…" Click="ExitClick"/><TextBlock x:Name="Notice" Text="Select your server folders in Setup to begin." TextWrapping="Wrap" Style="{StaticResource SecondaryText}" VerticalAlignment="Center"/></DockPanel>
+   </Grid>
+  </Grid>
  </Grid>
-</Window>
+</ui:FluentWindow>
