@@ -1,0 +1,69 @@
+# ProjZomb
+
+A portable Windows desktop manager for a **local Project Zomboid Build 42 dedicated server**, built with C#/.NET 8, WPF and Windows Forms notification-area integration. Version 0.1.0.
+
+## Version 1
+
+- Select an existing dedicated server or install/update to a chosen folder with a user-supplied Valve SteamCMD executable (app 380870, anonymous login, optional branch).
+- Start, save, gracefully stop and restart; readiness detection from server output; bounded live console and separate password input.
+- Close to the notification area. Explicit exit gracefully stops the managed server. A named mutex prevents multiple managers from controlling the same local machine.
+- Discover profile INI and the standard sandbox/spawn Lua files; searchable structured scalar editing, source comments and curated descriptions, plus full raw editing. Preserve unknown settings, ordering, comments and line endings. Lua is **never executed** by the editor.
+- Edit semicolon-separated Workshop item IDs and internal mod IDs through ordered line lists.
+- Online player list via `players`; request kick, username ban/unban, and access-level changes. Console responses remain authoritative.
+- Manual local backups and restore of profile configuration, world and server database. SHA-256 manifest checks, traversal/duplicate entry rejection, safety backup and rollback on application errors.
+- Configuration saves keep the previous file outside the server data directory and reject external-edit conflicts.
+
+## Run the portable release
+
+On Windows 10/11 x64, extract the portable ZIP to a user-writable folder and run `ProjZomb.exe`. Keep its `data` subfolder when moving it. The game server, downloaded mods, worlds and backups remain separate files; a single executable does not bundle them.
+
+1. In **Setup**, select the directory containing `StartServer64.bat`, your Zomboid data root, server profile name and separate backup folder. The data root contains `Server`, `Saves` and `db`; select the same root used by an existing server.
+2. For a new installation, obtain SteamCMD yourself from [Valve's documentation](https://developer.valvesoftware.com/wiki/SteamCMD), select `steamcmd.exe`, select the desired folder, then choose **Review and install / update**. Only run an executable you trust. A blank branch uses Steam's public branch; confirm that this supplies Build 42. Branch names and available versions can change. Password-protected branches are not supported.
+3. Save the profile and start. Watch **Console**. If the game asks for its initial administrator password, use **private input**; repeat if the game asks for confirmation. The manager does not echo entered commands, though the server itself can print sensitive output.
+4. Wait for `SERVER STARTED` in the output. A running process alone is not readiness. If the server's output format changes, inspect the console rather than assuming a startup hang.
+5. Stop the server before loading/editing configuration, installing updates, backups or restore. Confirm there is no independently started copy of that server. The app cannot supervise a server it did not launch.
+6. Reload **Configuration** after the first run generates files. Select each file, edit settings or Raw, then save. Restart to apply changes. Raw editing deliberately permits arbitrary game configuration; it is not a Lua syntax validator.
+7. Load the **Mods** lists before editing. Reorder lines to reorder mods. Dependency resolution, Workshop browsing and compatibility validation are manual. Map settings remain available in Configuration.
+8. Refresh **Players** while running. If your game build emits another roster format, enter an exact username or use the console. Actions are requests; check game responses. This version bans usernames, not Steam IDs.
+9. Backups require a stopped server. A restore replaces only the named profile, takes a safety snapshot first, validates archived file hashes and removes stale world files. SHA-256 detects corruption, not the authenticity of an untrusted archive. Keep backups private: they contain server passwords and player data.
+
+The window's X button hides it in the system tray. Use the tray menu or **Exit manager** to shut down intentionally. No automatic restart, automatic game update, telemetry, cloud upload, Discord integration or remote management is included.
+
+### Operating notes
+
+- The app reads the game's `StartServer64.bat` and writes a temporary sibling `.cmd` launcher to forward all arguments and skip interactive `PAUSE`, keeping its classpath and JVM settings. The original batch file is unchanged. The installation folder must be writable. Custom/multi-line launchers and hardcoded profile/data arguments are rejected for review. The helper is removed on normal process exit; after an OS crash a leftover `.projzomb-launch-*.cmd` can be deleted when stopped. It supplies `-servername` and `-cachedir`. The launcher's configured JVM memory applies. Adjust the game's supported launch configuration if the server reports memory allocation failure. Shell metacharacters in installation/data paths are rejected; use plain Windows paths.
+- Router forwarding and firewall setup are manual. Typical game ports are UDP 16261 and 16262; use the actual configured ports. Do not expose RCON publicly. This app uses process stdin, not RCON, and needs no RCON password.
+- The target is Build 42; version and mod combinations require testing. The app does not silently change game branches or migrate saves.
+- Descriptions are taken from comments provided by the server/mod plus a small curated catalog. Unknown settings explicitly have no verified description. Full, authoritative descriptions for every evolving Build 42/mod setting are **not bundled**. Structured editing covers simple assignment lines; arrays, expressions and unusual Lua structures remain raw.
+- There is no automatic attachment to already-running servers. Stop an existing server yourself before starting it here.
+- Unsigned executables may show a Windows reputation warning. This release is not code-signed.
+- Backup restore is protected against normal application failures, but is not power-loss transactional. Keep independent backups. Restore is limited to 100 GiB of expanded contents. Reparse points/symlinks in backed-up data are rejected.
+- First-run settings and backup paths default to local disk. Store the portable folder outside Program Files to allow profile writes.
+
+## Develop in VS Code on Windows
+
+Install the official [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) and VS Code's Microsoft C# tooling. Open this repository; use Terminal → Run Task or these commands:
+
+```powershell
+dotnet build ProjZomb.sln -c Release
+dotnet run --project tests/ProjZomb.Tests
+dotnet run --project src/ProjZomb.App
+```
+
+Publish the portable self-contained executable (the recipient does not need .NET installed):
+
+```powershell
+dotnet publish src/ProjZomb.App -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=None -o artifacts/win-x64
+```
+
+The Windows framework may extract bundled native libraries to the user's temporary folder. Build separately for other CPU architectures; this release targets x64. No third-party NuGet packages are required. Restore obtains Microsoft WindowsDesktop/.NET targeting/runtime packs from NuGet.
+
+Core tests run on Linux or Windows using only the SDK. The WPF project can be cross-compiled with `EnableWindowsTargeting`, but its UI and Windows batch launcher must run on Windows.
+
+## Validation status
+
+See [VALIDATION.md](VALIDATION.md) for checks executed in the development environment and the required Windows acceptance run. A compile and fake-server harness do not establish real Build 42 compatibility.
+
+## Internet and data boundaries
+
+The manager makes no application HTTP requests and has no upload or telemetry code. Clicking installation/update runs the user-selected SteamCMD after a review dialog. SteamCMD and the game contact Steam, download files and have their own behavior; they are separate software. The manager never downloads or executes setup scripts. Project development uses official SDK/packs with normal TLS and SDK archive SHA-512 verification; no local source, credentials or player data are uploaded.
