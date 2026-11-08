@@ -9,7 +9,7 @@ using TextBox = System.Windows.Controls.TextBox;
 
 internal static class Program
 {
-    // Runs on Windows only; no server is started, commands sent or profile files written.
+    // Runs on Windows only; no server/download is started. Any local preferences use the test output folder.
     [STAThread]
     private static int Main()
     {

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -27,6 +28,8 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
     private bool editorSync;
     private bool loading;
     private bool busy;
+    private CancellationTokenSource? steamCmdCancellation;
+    private string DefaultSteamCmdDirectory => Path.Combine(AppContext.BaseDirectory, "tools", "steamcmd");
     private bool exiting;
     private readonly Mutex instanceMutex;
 
@@ -58,6 +61,7 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
         InstallPath.Text = profile.InstallDirectory; DataPath.Text = profile.DataDirectory;
         BackupPath.Text = profile.BackupDirectory; SteamPath.Text = profile.SteamCmdPath;
         ProfileName.Text = profile.ServerName; BranchName.Text = profile.Branch;
+        RefreshSteamCmd();
         Closed += (_, _) => { tray.Dispose(); server.Dispose(); instanceMutex.ReleaseMutex(); instanceMutex.Dispose(); };
     }
     private void ThemeChanged(object sender, SelectionChangedEventArgs e)
@@ -123,10 +127,76 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
     private void BrowseInstall(object s, RoutedEventArgs e) => BrowseFolder(InstallPath);
     private void BrowseData(object s, RoutedEventArgs e) => BrowseFolder(DataPath);
     private void BrowseBackups(object s, RoutedEventArgs e) => BrowseFolder(BackupPath);
-    private void BrowseSteam(object s, RoutedEventArgs e)
+    private void RefreshSteamCmd()
     {
-        var picker = new Microsoft.Win32.OpenFileDialog { Filter = "Valve SteamCMD|steamcmd.exe", CheckFileExists = true };
-        if (picker.ShowDialog(this) == true) SteamPath.Text = picker.FileName;
+        // Only probe explicit locations, never scan drives or inspect environment variables.
+        var systemRoot = Path.GetPathRoot(Environment.GetFolderPath(Environment.SpecialFolder.System));
+        var common = string.IsNullOrEmpty(systemRoot) ? Array.Empty<string>() : new[] { Path.Combine(systemRoot, "steamcmd") };
+        var found = SteamCmdSetup.Detect(profile.SteamCmdPath, DefaultSteamCmdDirectory, common);
+        SteamPath.Text = found ?? "";
+        bool ready = found is not null;
+        SteamCmdStatus.Text = ready ? "SteamCMD found — ready to install or update your game server." : "SteamCMD was not found. Install it here or select its existing folder.";
+        SteamCmdSource.Text = "Official download: " + SteamCmdSetup.OfficialDownloadUrl + "\nDefault folder: " + DefaultSteamCmdDirectory;
+        InstallSteamCmdButton.Visibility = ready ? Visibility.Collapsed : Visibility.Visible;
+        InstallServerButton.IsEnabled = ready;
+        if (ready && found != profile.SteamCmdPath)
+        {
+            try { PersistSteamCmd(found!); }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException) { Notice.Text = "SteamCMD detected, but its location could not be saved: " + e.Message; }
+        }
+    }
+    private void PersistSteamCmd(string executable)
+    {
+        string previous = profile.SteamCmdPath;
+        profile.SteamCmdPath = executable;
+        try { profile.Save(settingsPath); }
+        catch { profile.SteamCmdPath = previous; throw; }
+        SteamPath.Text = executable;
+    }
+    private async void SelectSteamCmdFolder(object s, RoutedEventArgs e) => await Perform(() =>
+    {
+        using var picker = new Forms.FolderBrowserDialog { Description = "Select the folder containing steamcmd.exe", UseDescriptionForTitle = true, ShowNewFolderButton = false };
+        if (File.Exists(SteamPath.Text)) picker.SelectedPath = Path.GetDirectoryName(SteamPath.Text)!;
+        if (picker.ShowDialog() != Forms.DialogResult.OK) return;
+        PersistSteamCmd(SteamCmdSetup.SelectFolder(picker.SelectedPath));
+        RefreshSteamCmd();
+        Notice.Text = "SteamCMD location selected and saved.";
+    });
+    private async void InstallSteamCmdClick(object s, RoutedEventArgs e) => await Perform(async () =>
+    {
+        steamCmdCancellation = new CancellationTokenSource();
+        SteamCmdProgressPanel.Visibility = Visibility.Visible;
+        CancelSteamCmdButton.IsEnabled = true;
+        var progress = new Progress<SteamCmdProgress>(p =>
+        {
+            SteamCmdProgressText.Text = p.Message;
+            SteamCmdProgressBar.IsIndeterminate = !p.Percent.HasValue;
+            if (p.Percent.HasValue) SteamCmdProgressBar.Value = p.Percent.Value;
+        });
+        try
+        {
+            using var handler = new HttpClientHandler { AllowAutoRedirect = false };
+            using var http = new HttpClient(handler) { Timeout = TimeSpan.FromMinutes(5) };
+            var installer = new SteamCmdSetup(http, new WindowsSteamCmdPlatform());
+            var executable = await Task.Run(() => installer.InstallAsync(DefaultSteamCmdDirectory, progress,
+                line => Dispatcher.BeginInvoke(() => AppendLog(line)), steamCmdCancellation.Token));
+            PersistSteamCmd(executable);
+            RefreshSteamCmd();
+            Notice.Text = "SteamCMD installed and selected. Choose your game-server folder, then install the game server.";
+        }
+        catch (OperationCanceledException) when (steamCmdCancellation.IsCancellationRequested)
+        { Notice.Text = "SteamCMD installation cancelled. You can retry or select an existing folder."; }
+        finally
+        {
+            steamCmdCancellation.Dispose(); steamCmdCancellation = null;
+            SteamCmdProgressPanel.Visibility = Visibility.Collapsed;
+        }
+    });
+    private void CancelSteamCmdClick(object s, RoutedEventArgs e)
+    {
+        steamCmdCancellation?.Cancel();
+        CancelSteamCmdButton.IsEnabled = false;
+        SteamCmdProgressText.Text = "Cancelling SteamCMD installation…";
     }
     private async void SaveProfileClick(object s, RoutedEventArgs e) => await Perform(SaveProfile);
     private async void StartClick(object s, RoutedEventArgs e) => await Perform(() =>
@@ -152,7 +222,10 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
     private async void SecretKeyDown(object s, KeyEventArgs e) { if (e.Key == Key.Enter) { e.Handled = true; await SendPrivate(); } }
     private async void InstallClick(object s, RoutedEventArgs e) => await Perform(async () =>
     {
-        RequireStopped(); SaveProfile();
+        RequireStopped();
+        RefreshSteamCmd();
+        if (string.IsNullOrEmpty(SteamPath.Text)) throw new InvalidOperationException("Install SteamCMD or select its folder first.");
+        SaveProfile();
         if (!ConfirmStopped()) return;
         var branch = profile.Branch.Length == 0 ? "public (verify this is Build 42)" : profile.Branch;
         if (!Confirm($"Run your selected SteamCMD executable?\n\nExecutable: {profile.SteamCmdPath}\nInstall/update: {profile.InstallDirectory}\nApp: 380870\nBranch: {branch}\nLogin: anonymous\n\nSource documentation: https://developer.valvesoftware.com/wiki/SteamCMD\n\nOnly proceed if you obtained this executable from Valve. SteamCMD will download executable game files from Steam. Back up existing data before updating.")) return;

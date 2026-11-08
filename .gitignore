@@ -3,3 +3,7 @@
 artifacts/
 .vs/
 *.user
+/data/
+/backups/
+/tools/steamcmd/
+/tools/.steamcmd-install-*/

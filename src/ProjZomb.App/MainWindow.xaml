@@ -38,11 +38,17 @@
     <TextBlock Text="Backup folder (outside the data folder)"/><DockPanel><ui:Button DockPanel.Dock="Right" Content="Browse…" Click="BrowseBackups"/><TextBox x:Name="BackupPath" AutomationProperties.Name="Backup folder"/></DockPanel>
     <ui:Button Content="Save paths and profile" Appearance="Primary" HorizontalAlignment="Left" Click="SaveProfileClick"/>
     <GroupBox Header="Install / update server"><StackPanel>
-     <TextBlock Text="Trusted steamcmd.exe"/><DockPanel><ui:Button DockPanel.Dock="Right" Content="Browse…" Click="BrowseSteam"/><TextBox x:Name="SteamPath" AutomationProperties.Name="SteamCMD executable"/></DockPanel>
+     <TextBlock x:Name="SteamCmdStatus" Text="Looking for SteamCMD…" TextWrapping="Wrap"/>
+     <TextBox x:Name="SteamPath" AutomationProperties.Name="SteamCMD executable" IsReadOnly="True" TextWrapping="Wrap"/>
+     <WrapPanel>
+      <ui:Button x:Name="InstallSteamCmdButton" Content="Install SteamCMD" Appearance="Primary" Click="InstallSteamCmdClick"/>
+      <ui:Button Content="Select Folder" Click="SelectSteamCmdFolder"/>
+     </WrapPanel>
+     <TextBlock x:Name="SteamCmdSource" Style="{StaticResource SecondaryText}" TextWrapping="Wrap"/>
      <TextBlock Text="Steam branch (blank = public; verify that your selected branch supplies Build 42)"/><TextBox x:Name="BranchName" AutomationProperties.Name="Steam branch"/>
-     <TextBlock Text="SteamCMD source: https://developer.valvesoftware.com/wiki/SteamCMD — obtain it from Valve yourself. No bootstrap script is downloaded or executed by this app." TextWrapping="Wrap" Style="{StaticResource SecondaryText}"/>
+     <TextBlock Text="Install SteamCMD downloads directly from Valve over HTTPS, verifies its Valve digital signature, and initializes it in the background. An existing SteamCMD folder can be selected instead. No administrator rights or setup script are needed." TextWrapping="Wrap" Style="{StaticResource SecondaryText}"/>
      <TextBlock Text="Installation sends anonymous download requests to Steam. Existing worlds/configs are not uploaded. Back up before updates; older builds may not open newer saves." TextWrapping="Wrap"/>
-     <ui:Button Content="Review and install / update" HorizontalAlignment="Left" Click="InstallClick"/>
+     <ui:Button x:Name="InstallServerButton" Content="Install / update game server" HorizontalAlignment="Left" Click="InstallClick"/>
     </StackPanel></GroupBox>
     <TextBlock Text="First run: the server may request an administrator password in the Console tab. The launcher controls Java memory; adjust its supported launch settings if startup reports insufficient memory. Configure router/firewall UDP ports yourself. This app does not expose an administration website." TextWrapping="Wrap" Style="{StaticResource SecondaryText}"/>
    </StackPanel></ScrollViewer></TabItem>
@@ -98,7 +104,13 @@
     <TextBlock Text="Restore validates archive paths and SHA-256 hashes, takes a safety backup, then replaces this profile's data. Only ProjZomb archives for the same profile name are accepted. Backups contain passwords: protect your backup folder." TextWrapping="Wrap" Style="{StaticResource SecondaryText}"/>
    </StackPanel></ScrollViewer></TabItem>
   </TabControl>
-  <DockPanel Grid.Row="3" Margin="0,10,0,0"><ui:Button DockPanel.Dock="Right" Content="Exit manager…" Click="ExitClick"/><TextBlock x:Name="Notice" Text="Select your server folders in Setup to begin." TextWrapping="Wrap" Style="{StaticResource SecondaryText}" VerticalAlignment="Center"/></DockPanel>
+  <StackPanel Grid.Row="3" Margin="0,10,0,0">
+   <StackPanel x:Name="SteamCmdProgressPanel" Visibility="Collapsed">
+    <TextBlock x:Name="SteamCmdProgressText" TextWrapping="Wrap"/>
+    <DockPanel><ui:Button DockPanel.Dock="Right" x:Name="CancelSteamCmdButton" Content="Cancel installation" Click="CancelSteamCmdClick"/><ProgressBar x:Name="SteamCmdProgressBar" Minimum="0" Maximum="100" Height="6" Margin="0,8,16,12" AutomationProperties.Name="SteamCMD installation progress"/></DockPanel>
+   </StackPanel>
+   <DockPanel><ui:Button DockPanel.Dock="Right" Content="Exit manager…" Click="ExitClick"/><TextBlock x:Name="Notice" Text="Select your server folders in Setup to begin." TextWrapping="Wrap" Style="{StaticResource SecondaryText}" VerticalAlignment="Center"/></DockPanel>
+  </StackPanel>
    </Grid>
   </Grid>
  </Grid>

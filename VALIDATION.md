@@ -4,7 +4,7 @@
 
 - Official .NET SDK 8.0.427 downloaded from Microsoft's distribution endpoint and verified against the SHA-512 in Microsoft's release metadata. Normal TLS verification retained.
 - WPF cross-compilation and Windows x64 self-contained single-file publishing: succeeded with zero warnings/errors.
-- Final integration harness result: **32 passed, 0 failed**. SteamCMD behavior is exercised using a local test double, not the actual Steam client.
+- Original integration harness result: **32 passed, 0 failed** (expanded results below). SteamCMD behavior is exercised using a local test double, not the actual Steam client.
 - Dependency-free C# harness: INI round trips, targeted edits, sensitive-field identification, range/newline rejection, Lua round trips/nesting/comments/long strings, expression rejection, launcher normalization, player-input rejection, backup/restore, profile isolation (including overlapping name prefixes), stale world cleanup, safety backup, tamper rejection, traversal rejection, rollback after destination conflict, profile/path validation, and a real child-process fake server exercising readiness, roster parsing and graceful shutdown.
 
 Run the harness with `dotnet run --project tests/ProjZomb.Tests`. A nonzero exit indicates failure; this is an executable test harness rather than an xUnit/VSTest project. `dotnet test` is not a substitute.
@@ -43,3 +43,13 @@ Use a disposable Build 42 world, with independent backups of anything important:
 - Linux cross-build includes a Windows-only UI smoke harness. This harness is **compiled, not executed here**; no actual Windows screenshot or live UI accessibility audit has been performed. Existing 32 core integration checks remain separate from UI checks.
 - On Windows, close the normal app and run `dotnet run --project tests/ProjZomb.UiTests`. It resolves the actual resource dictionaries, visits all pages in dark/light, opens the access dropdown, enters a configuration cell, switches raw/settings, renders disabled actions and measures primary/secondary brush contrast against the application surface. It does not run a game server. Test profile paths are confined to its own output directory.
 - Manual acceptance: inspect hover/pressed/disabled states, dropdown items, selected/unfocused grid rows and active cell text, password caret, raw editor selection, tooltips, and notices in dark/light/system and Windows high contrast. Check keyboard navigation, 100%/150%/200% DPI, resizing/maximize/snap, and close-to-tray. Windows high contrast overrides the stored normal theme; confirm it restores correctly when high contrast is turned off.
+
+## SteamCMD setup (0.1.2)
+
+- Final expanded integration harness result: **61 passed, 0 failed**.
+
+- Checked Valve's official HTTPS archive URL and its current single `steamcmd.exe` entry. Inspected the public signature certificate data: the bootstrap's publisher is `Valve`. This is not a Windows Authenticode validation result; that API must be exercised on Windows.
+- Added saved/default/common-folder detection, explicit existing-folder validation and persistence, direct official download, measured download progress, indeterminate verification/initialization progress and cancellation outside disabled setup controls.
+- Setup restricts the archive URL/content/size, checks Valve Authenticode trust (including revocation) before execution and after self-update, initializes with `+quit`, checks for the installed Windows component, and publishes a staged installation without replacing an existing nonempty folder.
+- Core checks use an injected HTTP handler and platform double: detection precedence, selected/missing folders, official URL restrictions, unsafe/corrupt archives, signature gating, initialization completeness, preservation of existing folders, progress and cancellation cleanup. Actual WinVerifyTrust and SteamCMD startup were not executed on Linux.
+- Windows acceptance: on a clean writable portable folder, confirm the two missing-tool options; select an invalid and then a valid existing folder; restart and confirm persistence. On a separate clean copy, click Install SteamCMD, check progress while browsing Console, cancel during download/initialization, retry, and confirm the final default folder is automatically selected and game installation enabled. Confirm Valve signature errors fail closed without a running executable. Test download/network failure and a nonempty default folder, and verify existing files remain intact. Finally install a disposable game server through the automatically selected SteamCMD.
