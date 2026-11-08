@@ -29,7 +29,7 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
     private bool loading;
     private bool busy;
     private CancellationTokenSource? steamCmdCancellation;
-    private string DefaultSteamCmdDirectory => Path.Combine(AppContext.BaseDirectory, "tools", "steamcmd");
+    private const string DefaultSteamCmdDirectory = @"C:\SteamCMD";
     private bool exiting;
     private readonly Mutex instanceMutex;
 
@@ -131,7 +131,8 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
     {
         // Only probe explicit locations, never scan drives or inspect environment variables.
         var systemRoot = Path.GetPathRoot(Environment.GetFolderPath(Environment.SpecialFolder.System));
-        var common = string.IsNullOrEmpty(systemRoot) ? Array.Empty<string>() : new[] { Path.Combine(systemRoot, "steamcmd") };
+        var common = new[] { Path.Combine(AppContext.BaseDirectory, "tools", "steamcmd") }
+            .Concat(string.IsNullOrEmpty(systemRoot) ? Array.Empty<string>() : new[] { Path.Combine(systemRoot, "steamcmd") });
         var found = SteamCmdSetup.Detect(profile.SteamCmdPath, DefaultSteamCmdDirectory, common);
         SteamPath.Text = found ?? "";
         bool ready = found is not null;
