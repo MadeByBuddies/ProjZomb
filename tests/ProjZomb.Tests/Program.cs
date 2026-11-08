@@ -30,6 +30,7 @@ Directory.CreateDirectory(root);
 try
 {
     await SteamCmdSetupTests.RunAsync(root, Check);
+    await SteamCmdBootstrapTests.RunAsync(Check);
     var launcher = "@cd /d \"%~dp0\"\r\njava.exe -Xmx4g zombie.network.GameServer %1 %2\r\nPAUSE\r\n";
     var launch = WindowsLauncher.Prepare(launcher);
     Check(launch.Contains("%~dp0") && launch.Contains("%*") && !launch.Contains("%1") && !launch.Contains("\r\nPAUSE"), "Launcher forwards all arguments and removes pause without changing stock file");

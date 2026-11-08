@@ -40,6 +40,35 @@ public sealed class WindowsSteamCmdPlatform : ISteamCmdPlatform
 
     public async Task InitializeAsync(string executable, Action<string> log, CancellationToken cancel)
     {
+        var recent = new Queue<string>();
+        var gate = new object();
+        void Capture(string line)
+        {
+            lock (gate)
+            {
+                if (!string.IsNullOrWhiteSpace(line))
+                {
+                    recent.Enqueue(line.Length > 400 ? line[..400] : line);
+                    while (recent.Count > 12) recent.Dequeue();
+                }
+                log(line);
+            }
+        }
+        try
+        {
+            await SteamCmdBootstrap.RunAsync(token => RunOnceAsync(executable, Capture, token),
+                () => VerifyPublisher(executable), Capture, cancel);
+        }
+        catch (IOException e)
+        {
+            string context;
+            lock (gate) context = string.Join(Environment.NewLine, recent);
+            throw new IOException(e.Message + (context.Length == 0 ? "" : "\n\nRecent SteamCMD output:\n" + context), e);
+        }
+    }
+
+    private static async Task<int> RunOnceAsync(string executable, Action<string> log, CancellationToken cancel)
+    {
         var info = new ProcessStartInfo(executable)
         {
             WorkingDirectory = Path.GetDirectoryName(executable)!, UseShellExecute = false,
@@ -58,7 +87,7 @@ public sealed class WindowsSteamCmdPlatform : ISteamCmdPlatform
             await process.WaitForExitAsync(CancellationToken.None);
             throw;
         }
-        if (process.ExitCode != 0) throw new IOException($"SteamCMD initialization exited with code {process.ExitCode}. Review the console and retry.");
+        return process.ExitCode;
     }
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
