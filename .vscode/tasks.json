@@ -1,0 +1,10 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {"label": "Build", "type": "process", "command": "dotnet", "args": ["build", "ProjZomb.sln", "-c", "Release"], "group": {"kind": "build", "isDefault": true}, "problemMatcher": "$msCompile"},
+    {"label": "Run tests", "type": "process", "command": "dotnet", "args": ["run", "--project", "tests/ProjZomb.Tests"], "group": "test", "problemMatcher": "$msCompile"},
+    {"label": "Run app (Windows)", "type": "process", "command": "dotnet", "args": ["run", "--project", "src/ProjZomb.App"], "problemMatcher": "$msCompile"},
+    {"label": "Publish portable Windows x64", "type": "process", "command": "dotnet", "args": ["publish", "src/ProjZomb.App", "-c", "Release", "-r", "win-x64", "--self-contained", "true", "-p:PublishSingleFile=true", "-p:IncludeNativeLibrariesForSelfExtract=true", "-p:DebugType=None", "-o", "artifacts/win-x64"], "problemMatcher": "$msCompile"},
+    {"label": "UI smoke tests (Windows)", "type": "process", "command": "dotnet", "args": ["run", "--project", "tests/ProjZomb.UiTests"], "group": "test", "problemMatcher": "$msCompile"}
+  ]
+}

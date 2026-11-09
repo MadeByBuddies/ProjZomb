@@ -1,0 +1,6 @@
+{
+ "version": "0.2.0",
+ "configurations": [
+  { "name": "ProjZomb (Windows)", "type": "coreclr", "request": "launch", "preLaunchTask": "Build", "program": "${workspaceFolder}/src/ProjZomb.App/bin/Release/net8.0-windows/ProjZomb.dll", "cwd": "${workspaceFolder}/src/ProjZomb.App/bin/Release/net8.0-windows", "console": "internalConsole" }
+ ]
+}
