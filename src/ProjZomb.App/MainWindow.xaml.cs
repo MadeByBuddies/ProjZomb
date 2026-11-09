@@ -50,13 +50,16 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
         server.StateChanged += state =>
         {
             bool ready = server.IsReady;
+            bool consoleVerified = server.ConsoleVerified;
             Dispatcher.BeginInvoke(() =>
             {
+                if (state is "Starting" or ServerController.ReadyState) AutoLoadConfiguration();
+                SaveConfigButton.IsEnabled = !server.Running && !busy;
                 StatusText.Text = "● " + state;
                 StatusText.SetResourceReference(TextBlock.ForegroundProperty, ready ? "SystemFillColorSuccessBrush" : "TextFillColorPrimaryBrush");
-                StatusText.ToolTip = ready ? "Confirmed by the server's final startup banner. External network reachability is not tested." : "Server process and startup status.";
+                StatusText.ToolTip = ready ? (consoleVerified ? "Startup banner and automatic help response confirmed. External connectivity is not tested." : (state == ServerController.UnconfirmedState ? "Server startup banner detected, but the help check is unconfirmed. External connectivity is not tested." : "Server startup banner detected; waiting for the automatic help response. External connectivity is not tested.")) : "Server process and startup status.";
                 AppendLog("[ProjZomb] " + state + (ready ? " — server reports ready for connections." : ""));
-                if (ready) Notice.Text = "Server Start Complete — the server reports ready for connections.";
+                if (ready) Notice.Text = consoleVerified ? "Server Start Complete — help response confirms the console is responsive." : state == ServerController.UnconfirmedState ? "Server startup was detected, but the help check is unconfirmed. Inspect Console." : "Server startup detected — checking the console with help…";
                 tray.Text = ("ProjZomb — " + state)[..Math.Min(63, ("ProjZomb — " + state).Length)];
                 if (!server.Running) PlayersList.ItemsSource = Array.Empty<string>();
             });
@@ -98,7 +101,7 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
         SetupPanel.IsEnabled = LifecyclePanel.IsEnabled = ModsPanel.IsEnabled = BackupsPanel.IsEnabled = PlayerActions.IsEnabled = ConfigurationPanel.IsEnabled = false;
         try { await operation(); }
         catch (Exception e) { Alert(e.Message); }
-        finally { busy = false; SetupPanel.IsEnabled = LifecyclePanel.IsEnabled = ModsPanel.IsEnabled = BackupsPanel.IsEnabled = PlayerActions.IsEnabled = ConfigurationPanel.IsEnabled = true; }
+        finally { busy = false; SetupPanel.IsEnabled = LifecyclePanel.IsEnabled = ModsPanel.IsEnabled = BackupsPanel.IsEnabled = PlayerActions.IsEnabled = ConfigurationPanel.IsEnabled = true; SaveConfigButton.IsEnabled = !server.Running; }
     }
     private Task Perform(Action operation) => Perform(() => { operation(); return Task.CompletedTask; });
     private ServerProfile ReadProfile()
@@ -210,7 +213,7 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
     private async void SaveProfileClick(object s, RoutedEventArgs e) => await Perform(SaveProfile);
     private async void StartClick(object s, RoutedEventArgs e) => await Perform(() =>
     {
-        if (HasDirtyEditor()) throw new InvalidOperationException("Save or reload your configuration edits before starting.");
+        if (HasDirtyEditor() && !Confirm("Start using the configuration currently saved on disk? Your unsaved edits will be kept for saving after the server stops.")) return;
         SaveProfile();
         if (!Confirm("Start this installation as a Build 42 server? Verify your installed build/branch first. Mods may be downloaded by the game. You may need to enter the first-run administrator password in Console.")) return;
         server.Start(profile); Notice.Text = "Starting; watch the Console for readiness or first-run prompts.";
@@ -218,7 +221,7 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
     private async void StopClick(object s, RoutedEventArgs e) => await Perform(async () => await server.StopAsync());
     private async void RestartClick(object s, RoutedEventArgs e) => await Perform(async () =>
     {
-        if (HasDirtyEditor()) throw new InvalidOperationException("Save or reload configuration edits first.");
+        if (HasDirtyEditor() && !Confirm("Restart using the saved configuration? Your unsaved edits will be kept for saving after the server stops.")) return;
         await server.StopAsync(); server.Start(profile);
     });
     private async void SaveWorldClick(object s, RoutedEventArgs e) => await Perform(() => server.Send("save"));
@@ -249,10 +252,17 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
         try { return EditorTabs.SelectedIndex == 1 ? RawConfig.Text != loadedText : document.Render() != loadedText; }
         catch { return true; }
     }
-    private void ReloadFiles()
+    private void AutoLoadConfiguration()
     {
-        if (HasDirtyEditor() && !Confirm("Discard unsaved configuration edits and reload?")) return;
-        RequireStopped(); SaveProfile();
+        try { ReloadFiles(automatic: true); }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException)
+        { AppendLog("[ProjZomb] Configuration could not be loaded automatically: " + e.Message + ". Use Reload files to retry."); }
+    }
+    private void ReloadFiles(bool automatic = false)
+    {
+        if (HasDirtyEditor() && (automatic || !Confirm("Discard unsaved configuration edits and reload?"))) return;
+        // While running, read the active profile; do not save or change its paths.
+        if (!automatic && !server.Running) SaveProfile();
         loading = true;
         try
         {
@@ -263,7 +273,7 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
             ConfigFiles.ItemsSource = files;
             SettingsGrid.ItemsSource = null; RawConfig.Clear();
             ConfigFiles.SelectedIndex = files.Length > 0 ? 0 : -1;
-            Notice.Text = files.Length == 0 ? "No configuration files yet. Start the server once to generate them, then stop and reload." : "Configuration files loaded. Passwords are visible here; do not share screenshots or files.";
+            Notice.Text = files.Length == 0 ? "No configuration files yet. Start the server once to generate them; they will load when startup completes." : "Configuration files loaded. Passwords are visible here; do not share screenshots or files.";
         }
         finally { loading = false; }
         LoadSelectedFile();
@@ -281,7 +291,7 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
         }
         finally { editorSync = false; }
     }
-    private async void ReloadConfigClick(object s, RoutedEventArgs e) => await Perform(ReloadFiles);
+    private async void ReloadConfigClick(object s, RoutedEventArgs e) => await Perform(() => ReloadFiles());
     private async void ConfigFileChanged(object s, SelectionChangedEventArgs e)
     {
         if (loading || editorSync) return;
@@ -326,16 +336,8 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
         catch (Exception ex) { Alert(ex.Message); EditorTabs.SelectedIndex = 0; }
         finally { editorSync = false; }
     }
-    private void WriteChecked(string path, string original, string content)
-    {
-        RequireStopped();
-        if (!File.Exists(path) || File.ReadAllText(path) != original) throw new IOException("This file changed outside the editor. Reload before saving to avoid losing changes.");
-        if (content.Contains('\0')) throw new InvalidDataException("Configuration contains a NUL character.");
-        Directory.CreateDirectory(profile.BackupDirectory);
-        var snapshot = Path.Combine(profile.BackupDirectory, $"config-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}-{Path.GetFileName(path)}");
-        File.Copy(path, snapshot);
-        AtomicFile.Write(path, content);
-    }
+    private void WriteChecked(string path, string original, string content) =>
+        ConfigurationFiles.SaveChecked(path, original, content, profile.BackupDirectory, () => server.Running);
     private async void SaveConfigClick(object s, RoutedEventArgs e) => await Perform(() =>
     {
         RequireStopped();

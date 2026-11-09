@@ -65,7 +65,7 @@
    </Grid></TabItem>
    <TabItem Header="Configuration"><Grid x:Name="ConfigurationPanel"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
     <DockPanel><ui:Button DockPanel.Dock="Right" Content="Reload files" Click="ReloadConfigClick"/><ComboBox x:Name="ConfigFiles" AutomationProperties.Name="Configuration file" SelectionChanged="ConfigFileChanged" MinWidth="280"/></DockPanel>
-    <TextBlock Grid.Row="1" Text="Stop the server before editing. Changes require restart. Unknown settings and complex Lua remain available in Raw. Descriptions use server comments where available." TextWrapping="Wrap" Style="{StaticResource SecondaryText}"/>
+    <TextBlock Grid.Row="1" Text="Configuration loads on startup. Edit at any time; stop the server before saving. Saved changes apply on the next start. Unknown settings and complex Lua remain available in Raw. Descriptions use server comments where available." TextWrapping="Wrap" Style="{StaticResource SecondaryText}"/>
     <TabControl Grid.Row="2" x:Name="EditorTabs" SelectionChanged="EditorTabChanged">
      <TabItem Header="Settings"><Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="100"/></Grid.RowDefinitions>
       <TextBox x:Name="ConfigSearch" AutomationProperties.Name="Search settings" TextChanged="SearchChanged" ToolTip="Search setting name, category or description"/>
@@ -76,7 +76,7 @@
      </Grid></TabItem>
      <TabItem Header="Raw"><TextBox x:Name="RawConfig" AutomationProperties.Name="Raw configuration" AcceptsReturn="True" AcceptsTab="True" FontFamily="Consolas" FontSize="13" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/></TabItem>
     </TabControl>
-    <ui:Button Grid.Row="3" Content="Validate and save locally" Appearance="Primary" HorizontalAlignment="Left" Click="SaveConfigClick"/>
+    <ui:Button Grid.Row="3" x:Name="SaveConfigButton" Content="Validate and save locally" Appearance="Primary" HorizontalAlignment="Left" Click="SaveConfigClick"/>
    </Grid></TabItem>
    <TabItem Header="Mods"><ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel x:Name="ModsPanel">
     <TextBlock Text="Workshop and load order" Style="{StaticResource PageHeading}"/>

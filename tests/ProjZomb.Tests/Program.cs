@@ -17,10 +17,17 @@ if (args.Contains("--fake-server"))
     Console.WriteLine("Initializing Steam and loading world...");
     Console.WriteLine("LOG : Chat, 123> *** SERVER STARTED ***");
     Console.WriteLine("Server started loading mods; not ready yet");
+    int helpCount = 0;
     while (Console.ReadLine() is { } line)
     {
-        if (line == "test-ready") { Console.WriteLine("LOG  : General , 123> *** SERVER STARTED ****"); Console.WriteLine("*** SERVER STARTED ***"); }
+        if (line == "test-ready") { Console.WriteLine("LOG  : Network      f:0 st:140,017,981> *** SERVER STARTED ****"); Console.WriteLine("*** SERVER STARTED ***"); }
+        if (line == "help")
+        {
+            Console.WriteLine("HELP_COUNT:" + ++helpCount);
+            if (!args.Contains("--silent-help")) Console.WriteLine("List of server commands :");
+        }
         if (line == "players") { Console.WriteLine("Players connected (2):"); Console.WriteLine("-Alice"); Console.WriteLine("-Bob"); }
+        if (line == "test-help-reply") Console.WriteLine("LOG : General f:0 st:123> List of server commands :");
         if (line == "test-exit") Environment.Exit(1);
         if (line == "quit") { Console.WriteLine("*** SERVER STARTED ***"); break; }
     }
@@ -39,6 +46,10 @@ try
     Check(ServerReadiness.IsStartupComplete("LOG  : General f:0, t:123> GameServer.main> *** SERVER STARTED ****"), "Build 42 General/method startup log recognized");
     Check(!ServerReadiness.IsStartupComplete("LOG : Chat, 123> *** SERVER STARTED ***"), "Player chat cannot signal server readiness");
     Check(!ServerReadiness.IsStartupComplete("Server started downloading mods") && !ServerReadiness.IsStartupComplete("RakNet started") && !ServerReadiness.IsStartupComplete("Steam API initialized"), "Intermediate startup messages are not readiness");
+    Check(ServerReadiness.IsStartupComplete("LOG  : Network      f:0 st:140,017,981> *** SERVER STARTED ****"), "Actual Build 42 Network startup banner recognized");
+    Check(!ServerReadiness.IsStartupComplete("LOG : Network f:0 st:123> *** Steam is enabled") && !ServerReadiness.IsStartupComplete("LOG : General f:0 st:123> Server is listening on port 16261"), "Steam/listening messages alone are not the final banner");
+    Check(ServerReadiness.IsHelpResponse("List of server commands :") && ServerReadiness.IsHelpResponse("LOG : General f:0 st:123> List of server commands : <LINE>help"), "Raw and prefixed help responses recognized");
+    Check(!ServerReadiness.IsHelpResponse("LOG : Chat, 123> List of server commands :") && !ServerReadiness.IsHelpResponse("help"), "Chat and command echo do not confirm help response");
     var launcher = "@cd /d \"%~dp0\"\r\njava.exe -Xmx4g zombie.network.GameServer %1 %2\r\nPAUSE\r\n";
     var launch = WindowsLauncher.Prepare(launcher);
     Check(launch.Contains("%~dp0") && launch.Contains("%*") && !launch.Contains("%1") && !launch.Contains("\r\nPAUSE"), "Launcher forwards all arguments and removes pause without changing stock file");
@@ -46,6 +57,14 @@ try
     Throws(() => WindowsLauncher.Prepare("echo no java launcher"), "Unknown launcher rejected");
     var longLua = new ConfigDocument("SandboxVars = {\n Notes = [=[\nFakeSetting = true,\n]=],\n Real = false,\n}\n", true);
     Check(longLua.Entries.All(x => x.Key != "FakeSetting") && longLua.Entries.Any(x => x.Key == "Real"), "Lua long strings are not parsed as settings");
+    string editPath = Path.Combine(root, "editor.ini"), editBackups = Path.Combine(root, "editor backups");
+    File.WriteAllText(editPath, "PublicName=Original\n");
+    Throws(() => ConfigurationFiles.SaveChecked(editPath, "PublicName=Original\n", "PublicName=Draft\n", editBackups, () => true), "Configuration saving rejected while server is running");
+    Check(File.ReadAllText(editPath) == "PublicName=Original\n" && !Directory.Exists(editBackups), "Rejected live configuration save leaves files untouched");
+    ConfigurationFiles.SaveChecked(editPath, "PublicName=Original\n", "PublicName=Draft\n", editBackups, () => false);
+    Check(File.ReadAllText(editPath) == "PublicName=Draft\n" && Directory.GetFiles(editBackups).Any(p => File.ReadAllText(p) == "PublicName=Original\n"), "Stopped configuration save applies edits and preserves original snapshot");
+    Throws(() => ConfigurationFiles.SaveChecked(editPath, "PublicName=Original\n", "PublicName=Stale\n", editBackups, () => false), "Stale configuration edits do not overwrite externally changed files");
+    Check(File.ReadAllText(editPath) == "PublicName=Draft\n", "External-change conflict preserves current configuration");
     const string ini = "# Keep comment\r\nPublicName=My Server\r\nMods=A;B\r\nWorkshopItems=123;456\r\nUnknownModKey=x=y\r\nDefaultPort=16261\r\nPassword=secret\r\n";
     var doc = new ConfigDocument(ini, false);
     Check(doc.Render() == ini, "INI exact round trip including CRLF and unknown values");
@@ -118,10 +137,12 @@ try
     using var server = new ServerController();
     var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
     var roster = new TaskCompletionSource<IReadOnlyList<string>>(TaskCreationOptions.RunContinuationsAsynchronously);
+    var verified = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+    int helpRequests = 0;
     var loading = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
     int completions = 0;
-    server.Output += line => { if (line.Contains("not ready yet")) loading.TrySetResult(); };
-    server.StateChanged += s => { if (s == ServerController.ReadyState) { completions++; ready.TrySetResult(); } };
+    server.Output += line => { if (line.Contains("not ready yet")) loading.TrySetResult(); if (line == "HELP_COUNT:1") helpRequests++; };
+    server.StateChanged += s => { if (s == ServerController.ReadyState) { completions++; ready.TrySetResult(); } if (s == ServerController.VerifiedState) verified.TrySetResult(); };
     server.PlayersChanged += players => { if (players.Count == 2) roster.TrySetResult(players); };
     var info = new ProcessStartInfo("dotnet") { UseShellExecute = false, RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true };
     info.ArgumentList.Add(typeof(Program).Assembly.Location); info.ArgumentList.Add("--fake-server");
@@ -129,21 +150,38 @@ try
     await loading.Task.WaitAsync(TimeSpan.FromSeconds(10));
     Check(server.Running && !server.IsReady && server.State == "Starting", "A running/loading process is not marked joinable");
     server.Send("test-ready");
-    await ready.Task.WaitAsync(TimeSpan.FromSeconds(10)); Check(server.Running && server.IsReady && server.State == ServerController.ReadyState, "Server Start Complete requires final server output");
+    await ready.Task.WaitAsync(TimeSpan.FromSeconds(10)); Check(server.Running && server.IsReady && server.State.StartsWith(ServerController.ReadyState), "Server Start Complete requires final server output");
+    await verified.Task.WaitAsync(TimeSpan.FromSeconds(10));
+    Check(server.ConsoleVerified && server.IsReady && server.State == ServerController.VerifiedState, "Automatic help response verifies the running server console");
     server.Send("players"); var players = await roster.Task.WaitAsync(TimeSpan.FromSeconds(10));
     Check(players.SequenceEqual(new[] { "Alice", "Bob" }), "Players command parsed");
-    Check(completions == 1, "Repeated readiness banners produce one startup completion");
-    await server.StopAsync(TimeSpan.FromSeconds(10)); Check(!server.Running && !server.IsReady && server.State == "Stopped", "Graceful shutdown clears readiness and ignores late startup banners");
+    Check(completions == 1 && helpRequests == 1, "Repeated readiness banners produce one completion and one help request");
+    await server.StopAsync(TimeSpan.FromSeconds(10)); Check(!server.Running && !server.IsReady && !server.ConsoleVerified && server.State == "Stopped", "Graceful shutdown clears readiness and ignores late startup banners");
     loading = new(TaskCreationOptions.RunContinuationsAsynchronously);
     ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    verified = new(TaskCreationOptions.RunContinuationsAsynchronously);
     var exited = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
     server.StateChanged += s => { if (s.StartsWith("Exited")) exited.TrySetResult(); };
     server.StartProcess(info);
     await loading.Task.WaitAsync(TimeSpan.FromSeconds(10));
     Check(!server.IsReady && server.State == "Starting", "Restart resets readiness until the new server finishes loading");
-    server.Send("test-ready"); await ready.Task.WaitAsync(TimeSpan.FromSeconds(10));
+    server.Send("test-ready"); await verified.Task.WaitAsync(TimeSpan.FromSeconds(10));
+    Check(helpRequests == 2, "Restart performs a new automatic help check");
     server.Send("test-exit"); await exited.Task.WaitAsync(TimeSpan.FromSeconds(10));
     Check(!server.IsReady && !server.Running && server.State.StartsWith("Exited"), "Unexpected server exit clears startup-complete status");
+    using var silentServer = new ServerController(TimeSpan.FromMilliseconds(150));
+    var unconfirmed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+    silentServer.StateChanged += s => { if (s == ServerController.UnconfirmedState) unconfirmed.TrySetResult(); };
+    var silentInfo = new ProcessStartInfo("dotnet") { UseShellExecute = false, RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true };
+    silentInfo.ArgumentList.Add(typeof(Program).Assembly.Location); silentInfo.ArgumentList.Add("--fake-server"); silentInfo.ArgumentList.Add("--silent-help");
+    silentServer.StartProcess(silentInfo); silentServer.Send("test-ready");
+    await unconfirmed.Task.WaitAsync(TimeSpan.FromSeconds(10));
+    Check(silentServer.IsReady && !silentServer.ConsoleVerified, "Missing help reply is reported unconfirmed without hiding the startup banner");
+    var lateHelp = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+    silentServer.StateChanged += s => { if (s == ServerController.VerifiedState) lateHelp.TrySetResult(); };
+    silentServer.Send("test-help-reply"); await lateHelp.Task.WaitAsync(TimeSpan.FromSeconds(10));
+    Check(silentServer.ConsoleVerified && silentServer.IsReady, "A late help response confirms an initially unconfirmed startup");
+    await silentServer.StopAsync(TimeSpan.FromSeconds(10));
     Console.WriteLine($"\n{passed} checks passed.");
 }
 finally { Directory.Delete(root, true); }
