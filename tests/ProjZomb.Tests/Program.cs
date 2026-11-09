@@ -14,11 +14,15 @@ if (args.Contains("+app_update"))
 }
 if (args.Contains("--fake-server"))
 {
-    Console.WriteLine("*** SERVER STARTED ***");
+    Console.WriteLine("Initializing Steam and loading world...");
+    Console.WriteLine("LOG : Chat, 123> *** SERVER STARTED ***");
+    Console.WriteLine("Server started loading mods; not ready yet");
     while (Console.ReadLine() is { } line)
     {
+        if (line == "test-ready") { Console.WriteLine("LOG  : General , 123> *** SERVER STARTED ****"); Console.WriteLine("*** SERVER STARTED ***"); }
         if (line == "players") { Console.WriteLine("Players connected (2):"); Console.WriteLine("-Alice"); Console.WriteLine("-Bob"); }
-        if (line == "quit") break;
+        if (line == "test-exit") Environment.Exit(1);
+        if (line == "quit") { Console.WriteLine("*** SERVER STARTED ***"); break; }
     }
     return;
 }
@@ -31,6 +35,10 @@ try
 {
     await SteamCmdSetupTests.RunAsync(root, Check);
     await SteamCmdBootstrapTests.RunAsync(Check);
+    Check(ServerReadiness.IsStartupComplete("*** SERVER STARTED ****"), "Final raw startup banner recognized");
+    Check(ServerReadiness.IsStartupComplete("LOG  : General f:0, t:123> GameServer.main> *** SERVER STARTED ****"), "Build 42 General/method startup log recognized");
+    Check(!ServerReadiness.IsStartupComplete("LOG : Chat, 123> *** SERVER STARTED ***"), "Player chat cannot signal server readiness");
+    Check(!ServerReadiness.IsStartupComplete("Server started downloading mods") && !ServerReadiness.IsStartupComplete("RakNet started") && !ServerReadiness.IsStartupComplete("Steam API initialized"), "Intermediate startup messages are not readiness");
     var launcher = "@cd /d \"%~dp0\"\r\njava.exe -Xmx4g zombie.network.GameServer %1 %2\r\nPAUSE\r\n";
     var launch = WindowsLauncher.Prepare(launcher);
     Check(launch.Contains("%~dp0") && launch.Contains("%*") && !launch.Contains("%1") && !launch.Contains("\r\nPAUSE"), "Launcher forwards all arguments and removes pause without changing stock file");
@@ -110,15 +118,32 @@ try
     using var server = new ServerController();
     var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
     var roster = new TaskCompletionSource<IReadOnlyList<string>>(TaskCreationOptions.RunContinuationsAsynchronously);
-    server.StateChanged += s => { if (s == "Running") ready.TrySetResult(); };
+    var loading = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+    int completions = 0;
+    server.Output += line => { if (line.Contains("not ready yet")) loading.TrySetResult(); };
+    server.StateChanged += s => { if (s == ServerController.ReadyState) { completions++; ready.TrySetResult(); } };
     server.PlayersChanged += players => { if (players.Count == 2) roster.TrySetResult(players); };
     var info = new ProcessStartInfo("dotnet") { UseShellExecute = false, RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true };
     info.ArgumentList.Add(typeof(Program).Assembly.Location); info.ArgumentList.Add("--fake-server");
     server.StartProcess(info);
-    await ready.Task.WaitAsync(TimeSpan.FromSeconds(10)); Check(server.Running && server.State == "Running", "Server readiness from output");
+    await loading.Task.WaitAsync(TimeSpan.FromSeconds(10));
+    Check(server.Running && !server.IsReady && server.State == "Starting", "A running/loading process is not marked joinable");
+    server.Send("test-ready");
+    await ready.Task.WaitAsync(TimeSpan.FromSeconds(10)); Check(server.Running && server.IsReady && server.State == ServerController.ReadyState, "Server Start Complete requires final server output");
     server.Send("players"); var players = await roster.Task.WaitAsync(TimeSpan.FromSeconds(10));
     Check(players.SequenceEqual(new[] { "Alice", "Bob" }), "Players command parsed");
-    await server.StopAsync(TimeSpan.FromSeconds(10)); Check(!server.Running && server.State == "Stopped", "Graceful save/quit lifecycle");
+    Check(completions == 1, "Repeated readiness banners produce one startup completion");
+    await server.StopAsync(TimeSpan.FromSeconds(10)); Check(!server.Running && !server.IsReady && server.State == "Stopped", "Graceful shutdown clears readiness and ignores late startup banners");
+    loading = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    var exited = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+    server.StateChanged += s => { if (s.StartsWith("Exited")) exited.TrySetResult(); };
+    server.StartProcess(info);
+    await loading.Task.WaitAsync(TimeSpan.FromSeconds(10));
+    Check(!server.IsReady && server.State == "Starting", "Restart resets readiness until the new server finishes loading");
+    server.Send("test-ready"); await ready.Task.WaitAsync(TimeSpan.FromSeconds(10));
+    server.Send("test-exit"); await exited.Task.WaitAsync(TimeSpan.FromSeconds(10));
+    Check(!server.IsReady && !server.Running && server.State.StartsWith("Exited"), "Unexpected server exit clears startup-complete status");
     Console.WriteLine($"\n{passed} checks passed.");
 }
 finally { Directory.Delete(root, true); }

@@ -47,12 +47,20 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
         tray.ContextMenuStrip = menu;
         tray.DoubleClick += (_, _) => Dispatcher.Invoke(ShowWindow);
         server.Output += line => Dispatcher.BeginInvoke(() => AppendLog(line));
-        server.StateChanged += state => Dispatcher.BeginInvoke(() =>
+        server.StateChanged += state =>
         {
-            StatusText.Text = "● " + state;
-            tray.Text = ("ProjZomb — " + state)[..Math.Min(63, ("ProjZomb — " + state).Length)];
-            if (!server.Running) PlayersList.ItemsSource = Array.Empty<string>();
-        });
+            bool ready = server.IsReady;
+            Dispatcher.BeginInvoke(() =>
+            {
+                StatusText.Text = "● " + state;
+                StatusText.SetResourceReference(TextBlock.ForegroundProperty, ready ? "SystemFillColorSuccessBrush" : "TextFillColorPrimaryBrush");
+                StatusText.ToolTip = ready ? "Confirmed by the server's final startup banner. External network reachability is not tested." : "Server process and startup status.";
+                AppendLog("[ProjZomb] " + state + (ready ? " — server reports ready for connections." : ""));
+                if (ready) Notice.Text = "Server Start Complete — the server reports ready for connections.";
+                tray.Text = ("ProjZomb — " + state)[..Math.Min(63, ("ProjZomb — " + state).Length)];
+                if (!server.Running) PlayersList.ItemsSource = Array.Empty<string>();
+            });
+        };
         server.PlayersChanged += players => Dispatcher.BeginInvoke(() => { PlayersList.ItemsSource = players; Notice.Text = $"Online player response: {players.Count} player(s)."; });
         try { profile = ServerProfile.Load(settingsPath); }
         catch (Exception e) { Alert("Could not load saved profile: " + e.Message); }

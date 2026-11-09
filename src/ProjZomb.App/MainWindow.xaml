@@ -53,7 +53,10 @@
     <TextBlock Text="First run: the server may request an administrator password in the Console tab. The launcher controls Java memory; adjust its supported launch settings if startup reports insufficient memory. Configure router/firewall UDP ports yourself. This app does not expose an administration website." TextWrapping="Wrap" Style="{StaticResource SecondaryText}"/>
    </StackPanel></ScrollViewer></TabItem>
    <TabItem Header="Console"><Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-    <TextBlock Text="Live local output • commands are sent directly to the server. Input is not echoed or saved by this manager." Style="{StaticResource SecondaryText}" TextWrapping="Wrap"/>
+    <StackPanel>
+     <TextBlock Text="{Binding Text, ElementName=StatusText}" FontWeight="SemiBold" Foreground="{Binding Foreground, ElementName=StatusText}" ToolTip="{Binding ToolTip, ElementName=StatusText}"/>
+     <TextBlock Text="Live local output • Server Start Complete is confirmed from the game's final startup banner." Style="{StaticResource SecondaryText}" TextWrapping="Wrap"/>
+    </StackPanel>
     <TextBox Grid.Row="1" x:Name="ConsoleOutput" AutomationProperties.Name="Server console output" IsReadOnly="True" AcceptsReturn="True" FontFamily="Consolas" FontSize="12" TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/>
     <StackPanel Grid.Row="2">
      <DockPanel><ui:Button DockPanel.Dock="Right" Content="Send command" Appearance="Primary" Click="SendClick"/><TextBox x:Name="CommandInput" ToolTip="Console command (no leading slash)" AutomationProperties.Name="Console command" KeyDown="CommandKeyDown"/></DockPanel>

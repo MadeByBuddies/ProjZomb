@@ -9,12 +9,20 @@ public sealed class ServerController : IDisposable
     private bool stopping;
     private string? generatedLauncher;
     public bool Running => process is { HasExited: false };
+    public const string ReadyState = "Server Start Complete";
+    public bool IsReady { get; private set; }
     public string State { get; private set; } = "Stopped";
     public event Action<string>? Output;
     public event Action<string>? StateChanged;
     public event Action<IReadOnlyList<string>>? PlayersChanged;
     private List<string>? collectingPlayers;
-    private void SetState(string value) { State = value; StateChanged?.Invoke(value); }
+    private void SetState(string value)
+    {
+        IsReady = value == ReadyState && Running;
+        if (State == value) return;
+        State = value;
+        StateChanged?.Invoke(value);
+    }
     public void Start(ServerProfile profile)
     {
         if (Running) throw new InvalidOperationException("Server is already running.");
@@ -47,22 +55,32 @@ public sealed class ServerController : IDisposable
         process?.Dispose();
         stopping = false;
         collectingPlayers = null;
-        process = new Process { StartInfo = info, EnableRaisingEvents = true };
-        process.OutputDataReceived += (_, e) => Receive(e.Data);
-        process.ErrorDataReceived += (_, e) => Receive(e.Data);
-        process.Exited += (_, _) => { CleanupLauncher(); collectingPlayers = null; PlayersChanged?.Invoke(Array.Empty<string>()); SetState(stopping ? "Stopped" : "Exited — check console"); };
+        var current = new Process { StartInfo = info, EnableRaisingEvents = true };
+        process = current;
+        current.OutputDataReceived += (_, e) => Receive(current, e.Data);
+        current.ErrorDataReceived += (_, e) => Receive(current, e.Data);
+        current.Exited += (_, _) =>
+        {
+            lock (outputLock)
+            {
+                if (!ReferenceEquals(current, process)) return;
+                CleanupLauncher(); collectingPlayers = null; PlayersChanged?.Invoke(Array.Empty<string>());
+                SetState(stopping ? "Stopped" : "Exited — check console");
+            }
+        };
         SetState("Starting");
         try { process.Start(); process.BeginOutputReadLine(); process.BeginErrorReadLine(); }
         catch { SetState("Start failed"); throw; }
     }
     private readonly object outputLock = new();
-    private void Receive(string? line)
+    private void Receive(Process source, string? line)
     {
         if (line is null) return;
         lock (outputLock)
         {
+            if (!ReferenceEquals(source, process)) return;
             Output?.Invoke(line);
-            if (!stopping && (line.Contains("*** SERVER STARTED ***", StringComparison.OrdinalIgnoreCase) || line.Contains("SERVER STARTED", StringComparison.OrdinalIgnoreCase))) SetState("Running");
+            if (!stopping && Running && !IsReady && ServerReadiness.IsStartupComplete(line)) SetState(ReadyState);
             // PZ's console `players` response: Players connected (N): followed by -username.
             var header = Regex.Match(line, @"Players connected \((\d+)\):", RegexOptions.IgnoreCase);
             if (header.Success)
@@ -94,8 +112,11 @@ public sealed class ServerController : IDisposable
     public async Task StopAsync(TimeSpan? timeout = null)
     {
         if (!Running) return;
-        stopping = true;
-        SetState("Stopping — saving world");
+        lock (outputLock)
+        {
+            stopping = true;
+            SetState("Stopping — saving world");
+        }
         Send("save");
         Send("quit"); // The game performs its own final save as part of quit.
         using var cancellation = new CancellationTokenSource(timeout ?? TimeSpan.FromSeconds(90));

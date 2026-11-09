@@ -3,7 +3,7 @@
     <OutputType>WinExe</OutputType><TargetFramework>net8.0-windows</TargetFramework>
     <UseWPF>true</UseWPF><UseWindowsForms>true</UseWindowsForms><EnableWindowsTargeting>true</EnableWindowsTargeting>
     <ImplicitUsings>disable</ImplicitUsings><Nullable>enable</Nullable><ApplicationManifest>app.manifest</ApplicationManifest>
-    <AssemblyName>ProjZomb</AssemblyName><Version>0.1.3</Version>
+    <AssemblyName>ProjZomb</AssemblyName><Version>0.1.4</Version>
   </PropertyGroup>
   <ItemGroup><PackageReference Include="WPF-UI" Version="[4.3.0]" /></ItemGroup>
   <ItemGroup><Content Include="../../THIRD-PARTY-NOTICES.md" Link="THIRD-PARTY-NOTICES.md" CopyToOutputDirectory="PreserveNewest" ExcludeFromSingleFile="true" /><Content Include="../../licenses/WPF-UI-LICENSE.txt" Link="licenses/WPF-UI-LICENSE.txt" CopyToOutputDirectory="PreserveNewest" ExcludeFromSingleFile="true" /></ItemGroup>

@@ -61,3 +61,11 @@ Use a disposable Build 42 world, with independent backups of anything important:
 - The reported first-run exit code 7 was previously treated as an immediate failure. Initialization now retries that exit code up to three total runs under the existing timeout/cancellation token, re-verifying Valve's signature before every run. A zero exit, the final signature check and installed component checks remain required. Other nonzero exits fail immediately.
 - Persistent errors include the last 12 SteamCMD output lines in the error dialog; code 7 alone does not establish whether an updater restart or another bootstrap error caused the failure.
 - Added seven regression checks: 7→0, 7→7→0, persistent 7, another failure code, an invalid signature after update, cancellation during retry delay, and immediate success. Actual Windows SteamCMD execution remains unverified here; the user's console messages are needed if the bounded retry still fails.
+
+## Server startup completion (0.1.4)
+
+- Final core integration result: **76 passed, 0 failed**. The solution builds with zero warnings/errors; real Windows/game acceptance remains separate.
+
+- Added explicit `IsReady` state and **Server Start Complete** status based on the game's final startup banner (raw or General/Build 42 method-prefixed). Starting a process, initializing networking and player-chat text are not readiness. Repeated final banners produce one completion per launch.
+- Console now includes local lifecycle messages and a persistent status line; the main badge uses the success theme brush only while ready. Stop/restart/exit clears readiness, late shutdown banners cannot restore it, and callbacks from a previous process are ignored. This reports local game readiness, not a successful remote client join or router/firewall test.
+- Acceptance on Windows: start a disposable server and observe Starting while mods/world load, then confirm Server Start Complete follows the actual final game banner. Restart, stop and unexpected termination must clear it. Join from a game client to independently verify connectivity.
